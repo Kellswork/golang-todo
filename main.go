@@ -28,6 +28,11 @@ var rnd *renderer.Render
 var client *mongo.Client
 var db *mongo.Database
 
+const (
+	dbName         string = " todo-example"
+	collectionName string = "todo"
+)
+
 // create const for database after you have seen where you use these values
 
 // step 3 create a todo model struct type fior the mongo db database and a todo struct type for the frontend
@@ -64,10 +69,7 @@ func init() {
 	checkError(err)
 	err = client.Ping(ctx, readpref.Primary())
 	checkError(err)
-	db = client.Database("todo-example") // database name
-
-	// ask vic what this is doing, is thsi the right place to add it? i got it from the documentation,
-	// on stackoverflow someone suggested after the shutdown function
+	db = client.Database(dbName) // database name
 
 }
 
@@ -84,7 +86,7 @@ func getTodos(rw http.ResponseWriter, r *http.Request) {
 	// fetch all the todos stored in the databse collection
 	filter := bson.D{}
 	// if the error is not equal to nil,
-	cursor, err := db.Collection("todo").Find(context.Background(), filter)
+	cursor, err := db.Collection(collectionName).Find(context.Background(), filter)
 	if err != nil {
 		log.Printf("failed to fetch todo records from the db: %v\n", err.Error())
 		// render a json error message and the error
@@ -149,7 +151,7 @@ func createTodo(rw http.ResponseWriter, r *http.Request) {
 	}
 
 	// add the todo to the database
-	data, err := db.Collection("todo").InsertOne(r.Context(), todoModel)
+	data, err := db.Collection(collectionName).InsertOne(r.Context(), todoModel)
 	// return http status response if todo failed to save to the database
 	if err != nil {
 		log.Printf("failed to insert data into the database: %v\n", err.Error())
@@ -198,7 +200,7 @@ func updateTodo(rw http.ResponseWriter, r *http.Request) {
 	// update the todo in the database
 	filter := bson.M{"id": res}
 	update := bson.M{"$set": bson.M{"title": todo.Title, "completed": todo.Completed}}
-	data, err := db.Collection("todo").UpdateOne(r.Context(), filter, update)
+	data, err := db.Collection(collectionName).UpdateOne(r.Context(), filter, update)
 	// if error, return a json response, if succesfull return a json response with the updated data
 	if err != nil {
 		log.Printf("failed to update db collection: %v\n", err.Error())
@@ -229,7 +231,7 @@ func deleteTodo(rw http.ResponseWriter, r *http.Request) {
 	filter := bson.M{"id": res}
 	// options := bson.M{"$set": bson.M{"title": todo.Title, "completed": todo.Completed}}
 	// delete that todo entry in the database
-	if data, err := db.Collection("todo").DeleteOne(r.Context(), filter); err != nil {
+	if data, err := db.Collection(collectionName).DeleteOne(r.Context(), filter); err != nil {
 		// if error return a 500 http status and the error
 		log.Printf("could not delete item from database: %v\n", err.Error())
 		rnd.JSON(rw, http.StatusInternalServerError, renderer.M{
