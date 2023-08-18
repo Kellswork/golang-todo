@@ -1,0 +1,137 @@
+{{define "indexPage"}}
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+ <meta charset="UTF-8" />
+ <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+ <title>To Do App - with html, css and Javascript</title>
+ <link rel="preconnect" href="https://fonts.googleapis.com" />
+ <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+ <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;700&display=swap" rel="stylesheet" />
+ <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.2/css/all.min.css" />
+
+ <link rel="stylesheet" type="text/css" href="/static/style.css" />
+</head>
+
+<body>
+ <div class="container">
+  <div id="new-todo">
+   <input type="text" placeholder="Tasks to be done" />
+   <button type="button" id="submit">Add</button>
+  </div>
+  <div id="todos"> </div>
+ </div>
+ <script>
+  // create document query constant
+  let localhostAddress = "http://localhost:9000/todo"
+  let submitButton = document.querySelector('#submit');
+  let newTodoInput = document.querySelector('#new-todo input');
+  let todoListContainer = document.querySelector('#todos')
+
+  // fetch todos and display on page load
+  async function getTodos() {
+   const response = await fetch(localhostAddress);
+   const responseData = await response.json();
+   console.log(responseData);
+   // return just the data frm the response
+   return responseData.data
+  }
+
+  async function createTodo(data) {
+   try {
+    // csend the user input to the post todo to create a todo
+    const response = await fetch(localhostAddress, {
+     method: "POST",
+     headers: {
+      "Content-Type": "application/json",
+     },
+     body: JSON.stringify(data),
+    });
+
+    const result = await response.json();
+    console.log("Success:", result);
+   } catch (error) {
+    console.error("Error:", error);
+   }
+   // console.log('creating todo')
+   // loadTodos();
+   // console.log('loaded')
+  }
+
+  async function deleteTodo(id) {
+   try {
+    const response = await fetch(`${localhostAddress}/${id}`, { method: "Delete" });
+    const result = await response.json();
+    console.log("Success:", result);
+   } catch (error) {
+    console.error("Error:", error);
+   }
+  }
+
+
+  // submit todo event handler
+  submitButton.addEventListener('click', async () => {
+   // when the user clicks submit, call the createTodo
+   // fetch all todos again to add the just created todo
+   let value = newTodoInput.value;
+   const data = { title: value }
+   await createTodo(data)
+   await loadTodos();
+  }
+  )
+
+  // function to display the toodlist saved in the db
+  async function loadTodos() {
+   const todoList = await getTodos();
+   todoListContainer.innerHTML = '';
+   console.log('loading', todoList)
+   // show a message if there is no todo in the databse
+   if (todoList.length == 0) {
+    todoListContainer.innerHTML += ` 
+    <div class="todo" style= "display : ${todoList.length === 0 ? 'block' : 'none'};"> 
+        <span id="no-todo">You do not have any tasks 
+        </span>
+      </div>`;
+   } else {
+    // loop through the list and display each todo as inner html
+    todoList.forEach(
+     todo => {
+      document.querySelector('#todos').innerHTML += ` 
+    <div class="todo"> 
+        <span id="todoname">${todo.title}
+        </span>
+        <div class="actions">
+         <button data-id=${todo.id} class="edit">
+         <i class="fas fa-edit"></i>
+         </button>
+         <button data-id=${todo.id} class="delete">
+         <i class="far fa-trash-alt"></i>
+         </button>
+         <div>
+        
+      </div>`
+     });
+
+   }
+   console.log('loaded')
+
+   let deleteButton = await document.querySelectorAll('.delete');
+   for (let button of deleteButton) {
+    button.onclick = async function () {
+     const todoID = button.getAttribute('data-id')
+     await deleteTodo(todoID);
+     await loadTodos();
+    }
+   }
+
+  }
+
+  loadTodos();
+
+  console.log('checking')
+ </script>
+</body>
+
+</html>
+{{end}}
