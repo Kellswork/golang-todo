@@ -59,6 +59,23 @@
    // console.log('loaded')
   }
 
+  async function updateTodo(id, data) {
+   try {
+    // csend the user input to the post todo to create a todo
+    const response = await fetch(`${localhostAddress}/${id}`, {
+     method: "PUT",
+     headers: {
+      "Content-Type": "application/json",
+     },
+     body: JSON.stringify(data),
+    });
+    const result = await response.json();
+    console.log("Success:", result);
+   } catch (error) {
+    console.error("Error:", error);
+   }
+  }
+
   async function deleteTodo(id) {
    try {
     const response = await fetch(`${localhostAddress}/${id}`, { method: "Delete" });
@@ -71,15 +88,18 @@
 
 
   // submit todo event handler
-  submitButton.addEventListener('click', async () => {
-   // when the user clicks submit, call the createTodo
-   // fetch all todos again to add the just created todo
-   let value = newTodoInput.value;
-   const data = { title: value }
-   await createTodo(data)
-   await loadTodos();
-  }
-  )
+  // submitButton.addEventListener('click', async () => {
+  //  // when the user clicks submit, call the createTodo
+  //  // fetch all todos again to add the just created todo
+  //  let value = newTodoInput.value;
+  //  const data = { title: value }
+  //  await createTodo(data)
+  //  await loadTodos();
+  //  newTodoInput.value = ''
+  // }
+  // )
+
+
 
   // function to display the toodlist saved in the db
   async function loadTodos() {
@@ -98,9 +118,8 @@
     todoList.forEach(
      todo => {
       document.querySelector('#todos').innerHTML += ` 
-    <div class="todo"> 
-        <span id="todoname">${todo.title}
-        </span>
+    <div class="todo ${todo.completed ? "completed" : ''}" > 
+        <span id="todoname" data-iscomplete =${todo.completed}>${todo.title}</span>
         <div class="actions">
          <button data-id=${todo.id} class="edit">
          <i class="fas fa-edit"></i>
@@ -114,9 +133,9 @@
      });
 
    }
-   console.log('loaded')
 
    let deleteButton = await document.querySelectorAll('.delete');
+
    for (let button of deleteButton) {
     button.onclick = async function () {
      const todoID = button.getAttribute('data-id')
@@ -125,9 +144,43 @@
     }
    }
 
-  }
+   let editButton = await document.querySelectorAll('.edit');
+   let isComplete = ''
+   let todoID = ''
+   for (let button of editButton) {
+    console.log('button1', button)
+    const parent = button.parentNode.parentNode.children;
+    const todoName = parent[0];
+    const title = todoName.innerText;
+    
 
+    button.onclick = function () {
+     todoID = button.getAttribute('data-id');
+     isComplete = todoName.getAttribute('data-iscomplete');
+     newTodoInput.value = title
+     console.log('id',todoID, isComplete)
+    }
+   }
+
+   function updateTasks() {
+    submitButton.addEventListener('click', async () => {
+     let value = newTodoInput.value;
+     isComplete = isComplete === true;
+     const data = { title: value, completed: isComplete }
+      console.log(todoID, data)
+      await updateTodo(todoID, data)
+     await loadTodos();
+     newTodoInput.value = ''
+     todoID = ''
+     isComplete = ''
+    }
+    )
+   }
+   updateTasks();
+   console.log('loaded')
+  }
   loadTodos();
+
 
   console.log('checking')
  </script>
