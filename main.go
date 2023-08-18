@@ -27,6 +27,8 @@ var rnd *renderer.Render
 var client *mongo.Client
 var db *mongo.Database
 
+// var tmpl *template.Template
+
 const (
 	dbName         string = "todo-example"
 	collectionName string = "todo"
@@ -52,12 +54,21 @@ type (
 		Message string `json:"message"`
 		Data    []Todo `json:"data"`
 	}
+	frontend struct {
+		Header string
+		Body   string
+	}
 )
 
 func init() {
 	// step 4 create init function and connect to database
 	fmt.Println("init function running")
-	rnd = renderer.New()
+	// update rnd variable instance of rendender to parse html files
+	rnd = renderer.New(
+		renderer.Options{
+			ParseGlobPattern: "html/*.html",
+		},
+	)
 	var err error
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -71,8 +82,10 @@ func init() {
 }
 
 func homeHandler(rw http.ResponseWriter, r *http.Request) {
-	filePath := "./README.md"
-	err := rnd.FileView(rw, http.StatusOK, filePath, "readme.md")
+	// filePath := "./README.md"
+	// err := rnd.FileView(rw, http.StatusOK, filePath, "readme.md")
+	event := frontend{Header: "Testing one two three", Body: "Mikeee is checkingg"}
+	err := rnd.HTML(rw, http.StatusOK, "indexPage", event)
 	checkError(err)
 }
 
@@ -177,7 +190,9 @@ func updateTodo(rw http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&todo); err != nil {
 		log.Printf("failed to decode the json response body data: %v\n", err.Error())
 		rnd.JSON(rw, http.StatusInternalServerError, err.Error())
+		return
 	}
+
 	if todo.Title == "" {
 		rnd.JSON(rw, http.StatusBadRequest, renderer.M{
 			"message": "Title cannot be empty",
@@ -197,6 +212,7 @@ func updateTodo(rw http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
+
 	rnd.JSON(rw, http.StatusOK, renderer.M{
 		"message": "Todo updated successfully",
 		"data":    data.ModifiedCount,
@@ -233,6 +249,11 @@ func main() {
 	// step 8 create router and route handlers for home
 	router := chi.NewRouter()
 	router.Use(middleware.Logger)
+
+	//2. publish the css file so the html file can use the styles
+	fs := http.FileServer(http.Dir("static"))
+	router.Handle("/static/*", http.StripPrefix("/static/", fs))
+
 	router.Get("/", homeHandler)          // for homepage and todo routes
 	router.Mount("/todo", todoHandlers()) // Mount attaches another http.Handler along ./pattern/*
 
