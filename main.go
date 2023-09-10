@@ -27,14 +27,12 @@ var rnd *renderer.Render
 var client *mongo.Client
 var db *mongo.Database
 
-// var tmpl *template.Template
-
 const (
 	dbName         string = "todo-example"
 	collectionName string = "todo"
 )
 
-// step 3 create a todo model struct type fior the mongo db database and a todo struct type for the frontend
+// step 3 create struct type
 type (
 	TodoModel struct {
 		ID        primitive.ObjectID `bson:"id,omitempty"`
@@ -54,16 +52,18 @@ type (
 		Message string `json:"message"`
 		Data    []Todo `json:"data"`
 	}
-	frontend struct {
-		Header string
-		Body   string
+	CreateTodo struct {
+		Title string `json:"title"`
+	}
+	UpdateTodo struct {
+		Title     string `json:"title"`
+		Completed bool   `json:"completed"`
 	}
 )
 
 func init() {
 	// step 4 create init function and connect to database
 	fmt.Println("init function running")
-	// update rnd variable instance of rendender to parse html files
 	rnd = renderer.New(
 		renderer.Options{
 			ParseGlobPattern: "html/*.html",
@@ -84,8 +84,7 @@ func init() {
 func homeHandler(rw http.ResponseWriter, r *http.Request) {
 	// filePath := "./README.md"
 	// err := rnd.FileView(rw, http.StatusOK, filePath, "readme.md")
-	event := frontend{Header: "Testing one two three", Body: "Mikeee is checkingg"}
-	err := rnd.HTML(rw, http.StatusOK, "indexPage", event)
+	err := rnd.HTML(rw, http.StatusOK, "indexPage", nil)
 	checkError(err)
 }
 
@@ -128,10 +127,9 @@ func getTodos(rw http.ResponseWriter, r *http.Request) {
 }
 
 func createTodo(rw http.ResponseWriter, r *http.Request) {
-	// create variable todo for storing user input
-	var todo Todo
+	var todoReq CreateTodo
 	// process the client input, if it returns an error , send a http response of bad request
-	if err := json.NewDecoder(r.Body).Decode(&todo); err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&todoReq); err != nil {
 		log.Printf("failed to decode json data: %v\n", err.Error())
 		rnd.JSON(rw, http.StatusBadRequest, renderer.M{
 			"message": "could not decode data",
@@ -139,7 +137,7 @@ func createTodo(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// check if the title is empty, return a response error message of title required
-	if todo.Title == "" {
+	if todoReq.Title == "" {
 		log.Println("no title added to response body")
 		rnd.JSON(rw, http.StatusBadRequest, renderer.M{
 			"message": "please add a title",
@@ -149,7 +147,7 @@ func createTodo(rw http.ResponseWriter, r *http.Request) {
 	// create a todomodel for adding a todo to the database
 	todoModel := TodoModel{
 		ID:        primitive.NewObjectID(),
-		Title:     todo.Title,
+		Title:     todoReq.Title,
 		Completed: false,
 		CreatedAt: time.Now(),
 	}
@@ -165,7 +163,7 @@ func createTodo(rw http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	// if successfull, return a httpo status response success with the id.
+	// if successfull, return a http status response success with the id.
 	rnd.JSON(rw, http.StatusCreated, renderer.M{
 		"message": "Todo created successfully",
 		"ID":      data.InsertedID,
@@ -181,27 +179,26 @@ func updateTodo(rw http.ResponseWriter, r *http.Request) {
 		log.Printf("the id param is not a valid hex value: %v\n", err.Error())
 		rnd.JSON(rw, http.StatusBadRequest, renderer.M{
 			"message": "The id is invalid",
-			"error":   err.Error(),
 		})
 		return
 	}
 
-	var todo Todo
-	if err := json.NewDecoder(r.Body).Decode(&todo); err != nil {
+	var updateTodoReq UpdateTodo
+	if err := json.NewDecoder(r.Body).Decode(&updateTodoReq); err != nil {
 		log.Printf("failed to decode the json response body data: %v\n", err.Error())
 		rnd.JSON(rw, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	if todo.Title == "" {
+	if updateTodoReq.Title == "" {
 		rnd.JSON(rw, http.StatusBadRequest, renderer.M{
-			"message": "Title cannot be empty",
+			"message": "please add a title",
 		})
 		return
 	}
 	// update the todo in the database
 	filter := bson.M{"id": res}
-	update := bson.M{"$set": bson.M{"title": todo.Title, "completed": todo.Completed}}
+	update := bson.M{"$set": bson.M{"title": updateTodoReq.Title, "completed": updateTodoReq.Completed}}
 	data, err := db.Collection(collectionName).UpdateOne(r.Context(), filter, update)
 
 	if err != nil {
@@ -224,7 +221,9 @@ func deleteTodo(rw http.ResponseWriter, r *http.Request) {
 	res, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
 		log.Printf("invalid id: %v\n", err.Error())
-		rnd.JSON(rw, http.StatusBadRequest, err.Error())
+		rnd.JSON(rw, http.StatusBadRequest, renderer.M{
+			"message": "could not decode data",
+		})
 		return
 	}
 
@@ -234,7 +233,6 @@ func deleteTodo(rw http.ResponseWriter, r *http.Request) {
 		log.Printf("could not delete item from database: %v\n", err.Error())
 		rnd.JSON(rw, http.StatusInternalServerError, renderer.M{
 			"message": "an error eccoured while deleting todo item",
-			"error":   err.Error(),
 		})
 	} else {
 		rnd.JSON(rw, http.StatusOK, renderer.M{
@@ -250,14 +248,13 @@ func main() {
 	router := chi.NewRouter()
 	router.Use(middleware.Logger)
 
-	//2. publish the css file so the html file can use the styles
+	// publish the css file so the html file can use the styles
 	fs := http.FileServer(http.Dir("static"))
 	router.Handle("/static/*", http.StripPrefix("/static/", fs))
 
-	router.Get("/", homeHandler)          // for homepage and todo routes
+	router.Get("/", homeHandler)
 	router.Mount("/todo", todoHandlers()) // Mount attaches another http.Handler along ./pattern/*
 
-	// step 6 connect to a server
 	server := &http.Server{
 		Addr:         ":9000",
 		Handler:      router,
@@ -265,12 +262,10 @@ func main() {
 		WriteTimeout: 60 * time.Second,
 	}
 
-	// step 7: stop the server
-	// create channel to reccieve signal
 	stopChan := make(chan os.Signal, 1)
 	signal.Notify(stopChan, os.Interrupt)
 
-	// start the server in a seperate go routine. why? when done, try this without the go func , also ask vic if this is neccessary, that's the go func
+	// start the server in a seperate go routine
 	go func() {
 		fmt.Println("Server started on port", 9000)
 		if err := server.ListenAndServe(); err != nil {

@@ -24,16 +24,16 @@
  </div>
 
  <script>
-  // create document query constant
+  // create document query constants
   let localhostAddress = "http://localhost:9000/todo"
   let submitButton = document.querySelector('#submit');
   let newTodoInput = document.querySelector('#new-todo input');
   let todoListContainer = document.querySelector('#todos')
-  let isEditingtask = false
+  let isEditingtask = false // editTask is for tracking when we are editing a tasks
   let isComplete = ''
   let todoID = ''
 
-  // fetch todos and display on page load
+  // create async func to fetch todos
   async function getTodos() {
    const response = await fetch(localhostAddress);
    const responseData = await response.json();
@@ -42,9 +42,10 @@
    return responseData.data
   }
 
+  // async func to add a todo task
   async function createTodo(data) {
    try {
-    // csend the user input to the post todo to create a todo
+    // send POST request with user oinput as the req body
     const response = await fetch(localhostAddress, {
      method: "POST",
      headers: {
@@ -58,14 +59,11 @@
    } catch (error) {
     console.error("Error:", error);
    }
-   // console.log('creating todo')
-   // loadTodos();
-   // console.log('loaded')
   }
 
   async function updateTodo(id, data) {
    try {
-    // csend the user input to the post todo to create a todo
+    // async func to send PUT request to update data iwth the id
     const response = await fetch(`${localhostAddress}/${id}`, {
      method: "PUT",
      headers: {
@@ -144,30 +142,36 @@
 
    }
 
+   // this func is inside load todo because the html is omnmly created after the todo loads.
    let deleteButton = await document.querySelectorAll('.delete');
 
+   // fethc all the delete button, loop through it and attyach an onclick l;istner
    for (let button of deleteButton) {
     button.onclick = async function () {
+     // get the todo id using the html attrubite stuff
      const todoID = button.getAttribute('data-id')
      await deleteTodo(todoID);
      await loadTodos();
     }
    }
 
+
+// edit button func is similar to delete.
    let editButton = await document.querySelectorAll('.edit');
 
+   // this func is responsible for loading the text in the input box when a user clicks the edit button
    for (let button of editButton) {
     console.log('button1', button)
     const parent = button.parentNode.parentNode.children;
     const todoName = parent[0];
     const title = todoName.innerText;
 
-
     button.onclick = function () {
      todoID = button.getAttribute('data-id');
      isComplete = todoName.getAttribute('data-iscomplete');
      newTodoInput.value = title
      isEditingtask = true
+     // if edit task is true then we load the updateTasks() function when the user clicksd the submit button
      console.log('edit tsk', isEditingtask);
      console.log('id', todoID, isComplete)
     }
@@ -176,8 +180,10 @@
 
    console.log('loaded')
   }
+  // call laod todos when you laod the page
   loadTodos();
 
+  // this function is very sismilar to createTodo(), in the future, we will create a function that can handle both situations.
   async function updateTasks() {
    let value = newTodoInput.value;
    isComplete = isComplete === true;
@@ -193,13 +199,11 @@
    console.log('edit', isEditingtask);
    isEditingtask = false
   }
-
+// call the submit buttoon event listner for either updating or creating a new todo task.
   submitButton.addEventListener('click', () => {
    isEditingtask ? updateTasks() : AddTask()
    console.log('last', isEditingtask)
   })
-
-  console.log('checking')
  </script>
 </body>
 
