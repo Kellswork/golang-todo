@@ -24,8 +24,9 @@ import (
 
 // step 2 create variables
 var rnd *renderer.Render
-var client *mongo.Client
-var db *mongo.Database
+
+// var client *mongo.Client
+// var db *mongo.Database
 
 const (
 	dbName         string = "todo-example"
@@ -59,6 +60,12 @@ type (
 		Title     string `json:"title"`
 		Completed bool   `json:"completed"`
 	}
+
+	// we create a service struct to hold the dependencies required by our handlers in this case only the db connection for now
+	// we create a service struct and add the db as as fiekd, this way we can make the db variable available to the handlers. becuase it is no longe a global variable
+	Service struct {
+		db *mongo.Database
+	}
 )
 
 func init() {
@@ -69,16 +76,21 @@ func init() {
 			ParseGlobPattern: "html/*.html",
 		},
 	)
+
+}
+
+// for the function return type, you dont have to add the vairaible names only the types except its a named return type
+func initializeDB(uri string) (*mongo.Client, *mongo.Database) {
 	var err error
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	client, err = mongo.Connect(ctx, options.Client().ApplyURI("mongodb://localhost:27017"))
+	client, err := mongo.Connect(ctx, options.Client().ApplyURI(uri))
 	// log error for database connect failure
 	checkError(err)
 	err = client.Ping(ctx, readpref.Primary())
 	checkError(err)
-	db = client.Database(dbName)
-
+	db := client.Database(dbName)
+	return client, db
 }
 
 func homeHandler(rw http.ResponseWriter, r *http.Request) {
@@ -88,12 +100,12 @@ func homeHandler(rw http.ResponseWriter, r *http.Request) {
 	checkError(err)
 }
 
-func getTodos(rw http.ResponseWriter, r *http.Request) {
+func (s Service) getTodos(rw http.ResponseWriter, r *http.Request) {
 	// initialise a variable and assign empty array with type todomodel
 	var todoListFromDB = []TodoModel{}
 	// fetch all the todos stored in the databse collection
 	filter := bson.D{}
-	cursor, err := db.Collection(collectionName).Find(context.Background(), filter)
+	cursor, err := s.db.Collection(collectionName).Find(context.Background(), filter)
 	if err != nil {
 		log.Printf("failed to fetch todo records from the db: %v\n", err.Error())
 		// render a json error message and the error
@@ -126,7 +138,7 @@ func getTodos(rw http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func createTodo(rw http.ResponseWriter, r *http.Request) {
+func (s Service) createTodo(rw http.ResponseWriter, r *http.Request) {
 	var todoReq CreateTodo
 	// process the client input, if it returns an error , send a http response of bad request
 	if err := json.NewDecoder(r.Body).Decode(&todoReq); err != nil {
@@ -153,7 +165,7 @@ func createTodo(rw http.ResponseWriter, r *http.Request) {
 	}
 
 	// add the todo to the database
-	data, err := db.Collection(collectionName).InsertOne(r.Context(), todoModel)
+	data, err := s.db.Collection(collectionName).InsertOne(r.Context(), todoModel)
 	// return http status response if todo failed to save to the database
 	if err != nil {
 		log.Printf("failed to insert data into the database: %v\n", err.Error())
@@ -170,7 +182,7 @@ func createTodo(rw http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func updateTodo(rw http.ResponseWriter, r *http.Request) {
+func (s Service) updateTodo(rw http.ResponseWriter, r *http.Request) {
 	// get the id from the url params
 	id := strings.TrimSpace(chi.URLParam(r, "id"))
 	// check if the id is a hex value because we stored it as a hex value, if error return a message with id invalid
@@ -199,7 +211,7 @@ func updateTodo(rw http.ResponseWriter, r *http.Request) {
 	// update the todo in the database
 	filter := bson.M{"id": res}
 	update := bson.M{"$set": bson.M{"title": updateTodoReq.Title, "completed": updateTodoReq.Completed}}
-	data, err := db.Collection(collectionName).UpdateOne(r.Context(), filter, update)
+	data, err := s.db.Collection(collectionName).UpdateOne(r.Context(), filter, update)
 
 	if err != nil {
 		log.Printf("failed to update db collection: %v\n", err.Error())
@@ -216,7 +228,7 @@ func updateTodo(rw http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func deleteTodo(rw http.ResponseWriter, r *http.Request) {
+func (s Service) deleteTodo(rw http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	res, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
@@ -229,7 +241,7 @@ func deleteTodo(rw http.ResponseWriter, r *http.Request) {
 
 	filter := bson.M{"id": res}
 	// delete that todo entry in the database
-	if data, err := db.Collection(collectionName).DeleteOne(r.Context(), filter); err != nil {
+	if data, err := s.db.Collection(collectionName).DeleteOne(r.Context(), filter); err != nil {
 		log.Printf("could not delete item from database: %v\n", err.Error())
 		rnd.JSON(rw, http.StatusInternalServerError, renderer.M{
 			"message": "an error eccoured while deleting todo item",
@@ -244,6 +256,11 @@ func deleteTodo(rw http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	client, db := initializeDB("mongodb://localhost:27017")
+
+	service := Service{
+		db: db,
+	}
 	// step 8 create router and route handlers for home
 	router := chi.NewRouter()
 	router.Use(middleware.Logger)
@@ -253,7 +270,8 @@ func main() {
 	router.Handle("/static/*", http.StripPrefix("/static/", fs))
 
 	router.Get("/", homeHandler)
-	router.Mount("/todo", todoHandlers()) // Mount attaches another http.Handler along ./pattern/*
+	// update the todoHandlers to reciever methods in Go
+	router.Mount("/todo", todoHandlers(service)) // Mount attaches another http.Handler along ./pattern/*
 
 	server := &http.Server{
 		Addr:         ":9000",
@@ -293,13 +311,14 @@ func main() {
 }
 
 // step 9: create a group route for todo routers
-func todoHandlers() http.Handler {
+// update
+func todoHandlers(service Service) http.Handler {
 	router := chi.NewRouter()
 	router.Group(func(r chi.Router) {
-		r.Get("/", getTodos)
-		r.Post("/", createTodo)
-		r.Put("/{id}", updateTodo)
-		r.Delete("/{id}", deleteTodo)
+		r.Get("/", service.getTodos)
+		r.Post("/", service.createTodo)
+		r.Put("/{id}", service.updateTodo)
+		r.Delete("/{id}", service.deleteTodo)
 	})
 	return router
 }
