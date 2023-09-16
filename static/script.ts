@@ -144,8 +144,9 @@ async function loadTodos() {
   }
 
   // this func is inside load todo because the html is omnmly created after the todo loads.
-  let deleteButton: NodeListOf<HTMLButtonElement> =
-    document.querySelectorAll(".delete");
+  let deleteButton: HTMLButtonElement[] = Array.from(
+    document.querySelectorAll(".delete")
+  );
 
   // fethc all the delete button, loop through it and attyach an onclick l;istner
   for (let button of deleteButton) {
@@ -158,8 +159,9 @@ async function loadTodos() {
   }
 
   // edit button func is similar to delete.
-  let editButton: NodeListOf<HTMLButtonElement> =
-    document.querySelectorAll(".edit");
+  let editButton: HTMLButtonElement[] = Array.from(
+    document.querySelectorAll(".edit")
+  );
 
   // this func is responsible for loading the text in the input box when a user clicks the edit button
   for (let button of editButton) {
