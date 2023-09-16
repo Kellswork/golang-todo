@@ -16,6 +16,7 @@ async function getTodos() {
  return responseData.data
 }
 
+
 // async func to add a todo task
 async function createTodo(data) {
  try {
@@ -66,18 +67,19 @@ async function deleteTodo(id) {
 // submit todo event handler
 async function AddTask() {
  {
-  console.log('add', isEditingtask);
+  console.log('edit', isEditingtask);
 
   // when the user clicks submit, call the createTodo
   // fetch all todos again to add the just created todo
-  let value = newTodoInput.value;
-  const data = { title: value }
-  if (isEditingtask) u
-  await createTodo(data)
-  await loadTodos();
-  newTodoInput.value = ''
-  console.log('edit tsk', isEditingtask);
 
+    let value = newTodoInput.value;
+        const data = { title: value }
+    if (isEditingtask)
+    await createTodo(data)
+    await loadTodos();
+    newTodoInput.value = ''
+    console.log('edit tsk', isEditingtask);
+ 
  }
 }
 
@@ -160,7 +162,7 @@ loadTodos();
 // this function is very sismilar to createTodo(), in the future, we will create a function that can handle both situations.
 async function updateTasks() {
  let value = newTodoInput.value;
- isComplete = isComplete === true;
+  isComplete = isComplete === true;
 
  const data = { title: value, completed: isComplete }
  console.log(todoID, data)
