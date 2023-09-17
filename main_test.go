@@ -174,3 +174,117 @@ func TestCreateTodo(t *testing.T) {
 	// check chat gpt for the sample testing code it created
 
 }
+
+// ask victor to sho you how to create nsuites for the ones that would need aceess to the db and add things for get todo
+
+func TestCannotCreateTodoWithoutTitle(t *testing.T) {
+
+	// step.1 create a mock for what the user input is expected to be or ewhat the request body is meant to have
+	jsonStr := []byte(`{"title": ""}`)
+
+	// step. 2 make a post request to the rest api endpoint and pass in the jsonStr as the request body
+	req, err := http.NewRequest("POST", "/todo", bytes.NewBuffer(jsonStr))
+
+	// check that an error did not occuer while making the request, if it did occur , stop the app from running.
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// set the request header to content json for
+	req.Header.Set("Content-Type", "application/json")
+
+	// fetch the post request result and save the response in recorder
+	recorder := httptest.NewRecorder()
+
+	// initilaize the database to rstop the server so you'd have access to the handler function
+	_, db := initializeDB(dbUrl)
+	// golnag way of activiating this. read more about it
+	service := Service{
+		db: db,
+	}
+
+	// connect to the handler
+	handler := http.HandlerFunc(service.createTodo)
+	// why do we do this again?
+	handler.ServeHTTP(recorder, req)
+
+	// time to asert the returned value
+	require.Equal(t, http.StatusBadRequest, recorder.Code)
+
+	// create a result struct type to match what we expect back from the response body. in our case, the rendere is returning just amessage
+	// here we are decalring a result variable and attcahing an anonymous struct to it.
+	result := struct {
+		Message string `json:"message"`
+	}{}
+	// here we copy the recordere body value into the result variable using a pointer.
+	err = json.Unmarshal(recorder.Body.Bytes(), &result)
+	// here wecheck that the value is not nil
+	assert.Nil(t, err)
+	// latly, we assert that the message is what we expect it to be
+	assert.Equal(t, "please add a title", result.Message)
+}
+
+func TestGetTodos(t *testing.T) {
+	// test that teh db returns the correct status and the db collection in the database
+
+	//  make a post request to the rest api endpoint and pass in the nil as the request body
+	req, err := http.NewRequest("GET", "/todo", nil)
+
+	// check that an error did not occuer while making the request, if it did occur , stop the app from running.
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// fetch the post request result and save the response in recorder
+	recorder := httptest.NewRecorder()
+
+	// initilaize the database to rstop the server so you'd have access to the handler function
+	_, db := initializeDB(dbUrl)
+	// golnag way of activiating this. read more about it
+	service := Service{
+		db: db,
+	}
+
+	// connect to the handler
+	handler := http.HandlerFunc(service.getTodos)
+	// why do we do this again?
+	handler.ServeHTTP(recorder, req)
+
+	// time to asert the returned value
+	require.Equal(t, http.StatusOK, recorder.Code)
+
+	// create a result struct type to match what we expect back from the response body. in our case, the rendere is returning just amessage
+	// here we are decalring a result variable and attcahing an anonymous struct to it.
+	result := struct {
+		Message string `json:"message"`
+		Data    []Todo `json:"data"`
+	}{}
+	// here we copy the recordere body value into the result variable using a pointer.
+	err = json.Unmarshal(recorder.Body.Bytes(), &result)
+	// here wecheck that the value is not nil
+	assert.Nil(t, err)
+	// latly, we assert that the message is what we expect it to be
+
+	assert.Equal(t, "All todos retrieved", result.Message)
+}
+
+func TestUpdateTodo(t *testing.T) {
+	// Question: does the in memory db save data???
+
+	// create a new todo with the post request so we can have data to update
+	newTodo := []byte(`"title": "go to the beach"}`)
+	result, _ := http.NewRequest("POST", "/todo", bytes.NewBuffer(newTodo))
+	fmt.Println("updateTodo", result)
+	// update the title in the just created tod above and cahnge completed to True.
+	// the update request body takes a title and completed_at
+	jsonStr := []byte(`{"title": "go to the yard", "completed": true}`)
+
+	req, err := http.NewRequest("PUT", "/todo", bytes.NewBuffer(jsonStr))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	q := req.URL.Query()
+	q.Add("id", "")
+
+}
