@@ -11,11 +11,13 @@ import (
 	"net/http/httptest"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/ory/dockertest/v3"
 	"github.com/ory/dockertest/v3/docker"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -268,23 +270,61 @@ func TestGetTodos(t *testing.T) {
 	assert.Equal(t, "All todos retrieved", result.Message)
 }
 
+// still in progress
 func TestUpdateTodo(t *testing.T) {
 	// Question: does the in memory db save data???
 
-	// create a new todo with the post request so we can have data to update
-	newTodo := []byte(`"title": "go to the beach"}`)
-	result, _ := http.NewRequest("POST", "/todo", bytes.NewBuffer(newTodo))
-	fmt.Println("updateTodo", result)
+	// initilaize the database to rstop the server so you'd have access to the handler function
+	_, db := initializeDB(dbUrl)
+	// golnag way of activiating this. read more about it
+	service := Service{
+		db: db,
+	}
+	// initialize chi router
+
+	// add a new todo to the database so you can have something to test with
+	todo := struct {
+		ID        primitive.ObjectID `bson:"id,omitempty"`
+		Title     string             `bson:"title"`
+		Completed bool               `bson:"completed"`
+		CreatedAt time.Time          `bson:"created_at"`
+	}{ID: primitive.NewObjectID(),
+		Title:     "go to the salon",
+		Completed: false,
+		CreatedAt: time.Now()}
+	data, _ := service.db.Collection(collectionName).InsertOne(context.Background(), todo)
 	// update the title in the just created tod above and cahnge completed to True.
 	// the update request body takes a title and completed_at
-	jsonStr := []byte(`{"title": "go to the yard", "completed": true}`)
 
-	req, err := http.NewRequest("PUT", "/todo", bytes.NewBuffer(jsonStr))
-	if err != nil {
-		t.Fatal(err)
-	}
+	// // when I fetch the todo from the db, the data being returned is a hex value
+	// // I need to convert this id to a hex value
+	// // then as it into the query as an id so when the endpoint gets it,
+	// // it can convert it to primitive when it recieves the id.
 
-	q := req.URL.Query()
-	q.Add("id", "")
+	//  ocnert the primitive object id to a string
+	todoID := data.InsertedID.(primitive.ObjectID).Hex()
+
+	jsonStr := []byte(`{"title": "go to the mall instead", "completed": true}`)
+
+	// res, err := primitive.ObjectIDFromHex(todoID)
+	url := "/todo/" + todoID
+
+	req, _ := http.NewRequest("PUT", url, bytes.NewBuffer(jsonStr))
+
+	req.Header.Set("Content-Type", "application/json")
+	recorder := httptest.NewRecorder()
+	handler := http.HandlerFunc(service.updateTodo)
+	handler.ServeHTTP(recorder, req)
+
+	require.Equal(t, http.StatusOK, recorder.Code)
+
+	// result := struct {
+	// 	Message string `json:"message"`
+	// 	Data    int    `json:"data"`
+	// }{}
+	// err = json.Unmarshal(recorder.Body.Bytes(), &result)
+	// assert.Nil(t, err)
+	// assert.Equal(t, "Todo updated successfully", result.Message)
+	// assert.Equal(t, 1, result.Data)
 
 }

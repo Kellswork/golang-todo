@@ -184,11 +184,14 @@ func (s Service) createTodo(rw http.ResponseWriter, r *http.Request) {
 
 func (s Service) updateTodo(rw http.ResponseWriter, r *http.Request) {
 	// get the id from the url params
+	log.Printf("url value: %v\n", chi.URLParam(r, "id"))
 	id := strings.TrimSpace(chi.URLParam(r, "id"))
+	log.Printf("id value: %v\n", id)
 	// check if the id is a hex value because we stored it as a hex value, if error return a message with id invalid
 	res, err := primitive.ObjectIDFromHex(id)
+
 	if err != nil {
-		log.Printf("the id param is not a valid hex value: %v\n", err.Error())
+		log.Printf("the id param: %v\n", err.Error())
 		rnd.JSON(rw, http.StatusBadRequest, renderer.M{
 			"message": "The id is invalid",
 		})
