@@ -292,7 +292,9 @@ func TestUpdateTodo(t *testing.T) {
 		Title:     "go to the salon",
 		Completed: false,
 		CreatedAt: time.Now()}
-	data, _ := service.db.Collection(collectionName).InsertOne(context.Background(), todo)
+	_, err := service.db.Collection(collectionName).InsertOne(context.Background(), todo)
+	// check there is no error inserting
+	require.NoError(t, err)
 	// update the title in the just created tod above and cahnge completed to True.
 	// the update request body takes a title and completed_at
 
@@ -302,14 +304,18 @@ func TestUpdateTodo(t *testing.T) {
 	// // it can convert it to primitive when it recieves the id.
 
 	//  ocnert the primitive object id to a string
-	todoID := data.InsertedID.(primitive.ObjectID).Hex()
+	todoID := todo.ID.Hex()
 
 	jsonStr := []byte(`{"title": "go to the mall instead", "completed": true}`)
 
 	// res, err := primitive.ObjectIDFromHex(todoID)
 	url := "/todo/" + todoID
-
-	req, _ := http.NewRequest("PUT", url, bytes.NewBuffer(jsonStr))
+	log.Printf("url in test': %s", url)
+	req, reqErr := http.NewRequest("PUT", url, bytes.NewBuffer(jsonStr))
+	// check that an error did not occuer while making the request, if it did occur , stop the app from running.
+	if reqErr != nil {
+		t.Fatal(reqErr)
+	}
 
 	req.Header.Set("Content-Type", "application/json")
 	recorder := httptest.NewRecorder()
