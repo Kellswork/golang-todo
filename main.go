@@ -231,6 +231,7 @@ func (s Service) updateTodo(rw http.ResponseWriter, r *http.Request) {
 }
 
 func (s Service) deleteTodo(rw http.ResponseWriter, r *http.Request) {
+	fmt.Printf("got here")
 	id := chi.URLParam(r, "id")
 	res, err := primitive.ObjectIDFromHex(id)
 	if err != nil {
@@ -250,8 +251,8 @@ func (s Service) deleteTodo(rw http.ResponseWriter, r *http.Request) {
 		})
 	} else {
 		rnd.JSON(rw, http.StatusOK, renderer.M{
-			"message": "item deleted successfully",
-			"data":    data,
+			"message": "Todo deleted successfully",
+			"data":    data.DeletedCount,
 		})
 	}
 

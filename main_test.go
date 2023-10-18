@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-chi/chi"
 	"github.com/ory/dockertest/v3"
 	"github.com/ory/dockertest/v3/docker"
 	"github.com/stretchr/testify/assert"
@@ -310,12 +311,18 @@ func TestUpdateTodo(t *testing.T) {
 
 	// res, err := primitive.ObjectIDFromHex(todoID)
 	url := "/todo/" + todoID
-	log.Printf("url in test': %s", url)
+
 	req, reqErr := http.NewRequest("PUT", url, bytes.NewBuffer(jsonStr))
 	// check that an error did not occuer while making the request, if it did occur , stop the app from running.
 	if reqErr != nil {
 		t.Fatal(reqErr)
 	}
+
+	// create a new chiRouter context for the ID
+	// check chatgpt for definition
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("id", todoID)
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
 
 	req.Header.Set("Content-Type", "application/json")
 	recorder := httptest.NewRecorder()
@@ -324,13 +331,73 @@ func TestUpdateTodo(t *testing.T) {
 
 	require.Equal(t, http.StatusOK, recorder.Code)
 
-	// result := struct {
-	// 	Message string `json:"message"`
-	// 	Data    int    `json:"data"`
-	// }{}
-	// err = json.Unmarshal(recorder.Body.Bytes(), &result)
-	// assert.Nil(t, err)
-	// assert.Equal(t, "Todo updated successfully", result.Message)
+	result := struct {
+		Message string `json:"message"`
+		Data    int    `json:"data"`
+	}{}
+	err = json.Unmarshal(recorder.Body.Bytes(), &result)
+	assert.Nil(t, err)
+	assert.Equal(t, "Todo updated successfully", result.Message)
+	assert.Equal(t, 1, result.Data)
+
+}
+
+func TestDeleteTodo(t *testing.T) {
+	// Question: does the in memory db save data???
+
+	// initilaize the database to rstop the server so you'd have access to the handler function
+	_, db := initializeDB(dbUrl)
+	// golnag way of activiating this. read more about it
+	service := Service{
+		db: db,
+	}
+	// initialize chi router
+
+	// add a new todo to the database so you can have something to test with
+	todo := struct {
+		ID        primitive.ObjectID `bson:"id,omitempty"`
+		Title     string             `bson:"title"`
+		Completed bool               `bson:"completed"`
+		CreatedAt time.Time          `bson:"created_at"`
+	}{ID: primitive.NewObjectID(),
+		Title:     "go to the salon",
+		Completed: false,
+		CreatedAt: time.Now()}
+	_, err := service.db.Collection(collectionName).InsertOne(context.Background(), todo)
+	// check there is no error inserting
+	fmt.Printf("got merr")
+	require.NoError(t, err)
+
+	todoID := todo.ID.Hex()
+
+	url := "/todo/" + todoID
+
+	req, reqErr := http.NewRequest("DELETE", url, nil)
+	// check that an error did not occuer while making the request, if it did occur , stop the app from running.
+	if reqErr != nil {
+		t.Fatal(reqErr)
+	}
+
+	// create a new chiRouter context for the ID
+	// check chatgpt for definition
+	rctx := chi.NewRouteContext()
+	rctx.URLParams.Add("id", todoID)
+	req = req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
+
+	// req.Header.Set("Content-Type", "application/json")
+	recorder := httptest.NewRecorder()
+	handler := http.HandlerFunc(service.deleteTodo)
+	handler.ServeHTTP(recorder, req)
+
+	require.Equal(t, http.StatusOK, recorder.Code)
+
+	result := struct {
+		Message string `json:"message"`
+		Data    int    `json:"data"`
+	}{}
+	err = json.Unmarshal(recorder.Body.Bytes(), &result)
+	assert.Nil(t, err)
+	assert.Equal(t, "Todo deleted successfully", result.Message)
 	// assert.Equal(t, 1, result.Data)
 
 }
